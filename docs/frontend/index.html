@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Divisas Serverless - AWS Lambda</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .aws-badge {
+            background: linear-gradient(135deg, #FF9900 0%, #FF6600 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .currency-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-amount {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .result-details {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            border-left: 4px solid #c33;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #555;
+            text-align: center;
+        }
+
+        .info-box strong {
+            color: #333;
+        }
+
+        .demo-mode {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align: center;">
+            <span class="aws-badge">⚡ AWS Lambda</span>
+        </div>
+        
+        <h1>💱 Conversor de Divisas</h1>
+        <p class="subtitle">Serverless con AWS Lambda & API Gateway</p>
+
+        <div class="demo-mode">
+            <strong>🎨 MODO DEMO</strong><br>
+            Esta es la vista previa. Conecta con tu API Gateway para funcionalidad completa.
+        </div>
+
+        <form id="converterForm">
+            <div class="form-group">
+                <label for="amount">💰 Cantidad a Convertir</label>
+                <input 
+                    type="number" 
+                    id="amount" 
+                    placeholder="Ingresa la cantidad" 
+                    required 
+                    min="0.01" 
+                    step="0.01"
+                    value="100">
+            </div>
+
+            <div class="currency-row">
+                <div class="form-group">
+                    <label for="fromCurrency">🌍 Desde</label>
+                    <select id="fromCurrency" required>
+                        <option value="USD">🇺🇸 USD - Dólar</option>
+                        <option value="EUR">🇪🇺 EUR - Euro</option>
+                        <option value="COP">🇨🇴 COP - Peso Colombiano</option>
+                        <option value="GBP">🇬🇧 GBP - Libra</option>
+                        <option value="JPY">🇯🇵 JPY - Yen</option>
+                        <option value="MXN">🇲🇽 MXN - Peso Mexicano</option>
+                        <option value="BRL">🇧🇷 BRL - Real</option>
+                        <option value="CAD">🇨🇦 CAD - Dólar Canadiense</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="toCurrency">🎯 Hasta</label>
+                    <select id="toCurrency" required>
+                        <option value="COP">🇨🇴 COP - Peso Colombiano</option>
+                        <option value="USD">🇺🇸 USD - Dólar</option>
+                        <option value="EUR">🇪🇺 EUR - Euro</option>
+                        <option value="GBP">🇬🇧 GBP - Libra</option>
+                        <option value="JPY">🇯🇵 JPY - Yen</option>
+                        <option value="MXN">🇲🇽 MXN - Peso Mexicano</option>
+                        <option value="BRL">🇧🇷 BRL - Real</option>
+                        <option value="CAD">🇨🇦 CAD - Dólar Canadiense</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" id="convertBtn">🔄 Convertir Ahora</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Consultando tasas de cambio...</p>
+        </div>
+
+        <div class="result" id="result">
+            <div class="result-amount" id="resultAmount"></div>
+            <div class="result-details" id="resultDetails"></div>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="info-box">
+            <strong>⚡ Arquitectura Serverless:</strong><br>
+            AWS Lambda + API Gateway + ExchangeRate-API<br>
+            <small>✅ Sin servidores | ✅ Escalado automático | ✅ Pago por uso</small>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ IMPORTANTE: Reemplaza con tu URL de API Gateway
+        const API_BASE_URL = 'https://xn6lxsf1e2.execute-api.us-east-2.amazonaws.com/prod';
+
+        const form = document.getElementById('converterForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const error = document.getElementById('error');
+        const convertBtn = document.getElementById('convertBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Limpiar resultados previos
+            result.classList.remove('show');
+            error.classList.remove('show');
+            loading.classList.add('show');
+            convertBtn.disabled = true;
+
+            // Obtener valores del formulario
+            const amount = parseFloat(document.getElementById('amount').value);
+            const fromCurrency = document.getElementById('fromCurrency').value;
+            const toCurrency = document.getElementById('toCurrency').value;
+
+            // Validación básica
+            if (fromCurrency === toCurrency) {
+                error.textContent = '⚠️ Las monedas deben ser diferentes';
+                error.classList.add('show');
+                loading.classList.remove('show');
+                convertBtn.disabled = false;
+                return;
+            }
+
+            try {
+                console.log('Llamando a:', `${API_BASE_URL}/convert`);
+                console.log('Datos:', { amount, from_currency: fromCurrency, to_currency: toCurrency });
+
+                // Llamar a la función Lambda a través de API Gateway
+                const response = await fetch(`${API_BASE_URL}/convert`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        from_currency: fromCurrency,
+                        to_currency: toCurrency
+                    })
+                });
+
+                console.log('Status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Respuesta:', data);
+
+                if (data.success) {
+                    // Mostrar resultado
+                    document.getElementById('resultAmount').textContent = 
+                        `${data.converted_amount.toLocaleString('es-CO', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        })} ${data.to_currency}`;
+                    
+                    document.getElementById('resultDetails').innerHTML = 
+                        `<strong>${data.amount.toLocaleString('es-CO')} ${data.from_currency}</strong> equivale a 
+                        <strong>${data.converted_amount.toLocaleString('es-CO')} ${data.to_currency}</strong><br>
+                        📊 Tasa de cambio: 1 ${data.from_currency} = ${data.rate} ${data.to_currency}`;
+                    
+                    result.classList.add('show');
+                } else {
+                    throw new Error(data.error || 'Error en la conversión');
+                }
+
+            } catch (err) {
+                console.error('Error:', err);
+                // Mostrar error
+                error.innerHTML = `<strong>❌ Error:</strong> ${err.message}<br>
+                    <small>Verifica que tu API Gateway esté correctamente configurada y que las funciones Lambda tengan los permisos necesarios.</small>`;
+                error.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                convertBtn.disabled = false;
+            }
+        });
+
+        // Validación en tiempo real
+        document.getElementById('amount').addEventListener('input', (e) => {
+            if (e.target.value < 0) {
+                e.target.value = 0;
+            }
+        });
+
+        // Mostrar mensaje de bienvenida en consola
+        console.log('%c🚀 Conversor de Divisas Serverless', 'color: #667eea; font-size: 20px; font-weight: bold;');
+        console.log('%cArquitectura: AWS Lambda + API Gateway', 'color: #764ba2; font-size: 14px;');
+        console.log('API Endpoint:', API_BASE_URL);
+    </script>
+</body>
+</html>
